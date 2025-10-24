@@ -1,0 +1,714 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>NGram Network Visualizer</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.3.2/papaparse.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.8.5/d3.min.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+        
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            background: rgba(255, 255, 255, 0.95);
+            border-radius: 20px;
+            padding: 30px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+        }
+        
+        h1 {
+            color: #667eea;
+            margin-bottom: 5px;
+            font-size: 2em;
+        }
+        
+        .author {
+            color: #888;
+            margin-bottom: 10px;
+            font-size: 0.9em;
+            font-style: italic;
+        }
+        
+        .subtitle {
+            color: #666;
+            margin-bottom: 25px;
+            font-size: 0.95em;
+        }
+        
+        .upload-section {
+            margin-bottom: 25px;
+            padding: 25px;
+            background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+            border-radius: 15px;
+            border: 2px dashed #667eea;
+        }
+        
+        .file-input-wrapper {
+            position: relative;
+            display: inline-block;
+        }
+        
+        input[type="file"] {
+            display: none;
+        }
+        
+        .file-label {
+            display: inline-block;
+            padding: 12px 30px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border-radius: 10px;
+            cursor: pointer;
+            font-weight: 600;
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+        
+        .file-label:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(102, 126, 234, 0.4);
+        }
+        
+        .file-name {
+            display: inline-block;
+            margin-left: 15px;
+            color: #333;
+            font-weight: 500;
+        }
+        
+        .controls {
+            margin-bottom: 20px;
+            display: flex;
+            gap: 15px;
+            flex-wrap: wrap;
+            align-items: center;
+        }
+        
+        .mode-selector {
+            display: flex;
+            background: #f0f0f0;
+            border-radius: 10px;
+            padding: 4px;
+            gap: 4px;
+        }
+        
+        .mode-btn {
+            padding: 8px 20px;
+            background: transparent;
+            color: #555;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: 600;
+            font-size: 14px;
+            transition: all 0.3s;
+        }
+        
+        .mode-btn.active {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            box-shadow: 0 2px 8px rgba(102, 126, 234, 0.3);
+        }
+        
+        .mode-btn:hover:not(.active) {
+            background: #e0e0e0;
+        }
+        
+        .save-btn {
+            padding: 10px 25px;
+            background: linear-gradient(135deg, #28a745 0%, #20c997 100%);
+            color: white;
+            border: none;
+            border-radius: 10px;
+            cursor: pointer;
+            font-weight: 600;
+            font-size: 14px;
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+        
+        .save-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(40, 167, 69, 0.4);
+        }
+        
+        .save-btn:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+            transform: none;
+        }
+        
+        .control-group {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        
+        label {
+            font-weight: 600;
+            color: #555;
+        }
+        
+        input[type="number"] {
+            padding: 8px 12px;
+            border: 2px solid #ddd;
+            border-radius: 8px;
+            width: 100px;
+            font-size: 14px;
+            transition: border-color 0.3s;
+        }
+        
+        input[type="number"]:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+        
+        .stats {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+        
+        .stat-card {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            padding: 20px;
+            border-radius: 12px;
+            color: white;
+            box-shadow: 0 5px 15px rgba(102, 126, 234, 0.3);
+        }
+        
+        .stat-label {
+            font-size: 0.85em;
+            opacity: 0.9;
+            margin-bottom: 5px;
+        }
+        
+        .stat-value {
+            font-size: 1.8em;
+            font-weight: bold;
+        }
+        
+        #network {
+            width: 100%;
+            height: 700px;
+            border: 2px solid #ddd;
+            border-radius: 15px;
+            background: #fafafa;
+            overflow: hidden;
+            cursor: grab;
+        }
+        
+        #network:active {
+            cursor: grabbing;
+        }
+        
+        .node {
+            cursor: move;
+            transition: r 0.3s;
+        }
+        
+        .node:hover {
+            stroke: #ff6b6b;
+            stroke-width: 3px;
+        }
+        
+        .link {
+            stroke: #999;
+            stroke-opacity: 0.6;
+        }
+        
+        .edge-label {
+            font-size: 12px;
+            fill: #333;
+            font-weight: bold;
+            pointer-events: none;
+            background: white;
+            paint-order: stroke;
+            stroke: white;
+            stroke-width: 3px;
+            stroke-linecap: round;
+            stroke-linejoin: round;
+        }
+        
+        .node-label {
+            font-size: 11px;
+            pointer-events: none;
+            fill: #333;
+            font-weight: 500;
+        }
+        
+        .node-freq {
+            font-size: 10px;
+            pointer-events: none;
+            fill: white;
+            font-weight: bold;
+            text-anchor: middle;
+        }
+        
+        .error {
+            background: #fee;
+            border: 2px solid #fcc;
+            color: #c33;
+            padding: 15px;
+            border-radius: 10px;
+            margin-bottom: 20px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>NGram Network Visualizer</h1>
+        <p class="author">Ikbal Maulana @2025</p>
+        <p class="subtitle">Upload a CSV file to visualize NGram relationships based on overlapping phrases</p>
+        
+        <div class="upload-section">
+            <div class="file-input-wrapper">
+                <input type="file" id="fileInput" accept=".csv">
+                <label for="fileInput" class="file-label">Choose CSV File</label>
+            </div>
+            <span class="file-name" id="fileName">No file chosen</span>
+        </div>
+        
+        <div class="controls">
+            <div class="mode-selector">
+                <button class="mode-btn active" id="modeOverlapping">Overlapping</button>
+                <button class="mode-btn" id="modeBagOfWords">Bag-of-Words</button>
+            </div>
+            <div class="control-group">
+                <label for="minWeight">Min Edge Weight:</label>
+                <input type="number" id="minWeight" value="5" min="0" step="1">
+            </div>
+            <div class="control-group">
+                <label for="minFreq">Min Frequency:</label>
+                <input type="number" id="minFreq" value="0" min="0" step="1">
+            </div>
+            <button id="saveGML" class="save-btn" disabled>Save to GML</button>
+        </div>
+        
+        <div id="error" class="error" style="display: none;"></div>
+        
+        <div class="stats" id="stats" style="display: none;">
+            <div class="stat-card">
+                <div class="stat-label">Total Nodes</div>
+                <div class="stat-value" id="nodeCount">0</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-label">Total Edges</div>
+                <div class="stat-value" id="edgeCount">0</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-label">Avg Edge Weight</div>
+                <div class="stat-value" id="avgWeight">0</div>
+            </div>
+        </div>
+        
+        <div id="network"></div>
+    </div>
+
+    <script>
+        let ngramData = [];
+        let svg, simulation;
+        let currentNodes = [];
+        let currentLinks = [];
+        let currentFileName = '';
+        let currentMode = 'overlapping'; // 'overlapping' or 'bagofwords'
+
+        document.getElementById('fileInput').addEventListener('change', handleFileSelect);
+        document.getElementById('minWeight').addEventListener('change', updateVisualization);
+        document.getElementById('minFreq').addEventListener('change', updateVisualization);
+        document.getElementById('saveGML').addEventListener('click', saveToGML);
+        document.getElementById('modeOverlapping').addEventListener('click', () => setMode('overlapping'));
+        document.getElementById('modeBagOfWords').addEventListener('click', () => setMode('bagofwords'));
+
+        function setMode(mode) {
+            currentMode = mode;
+            
+            // Update button styles
+            if (mode === 'overlapping') {
+                document.getElementById('modeOverlapping').classList.add('active');
+                document.getElementById('modeBagOfWords').classList.remove('active');
+            } else {
+                document.getElementById('modeOverlapping').classList.remove('active');
+                document.getElementById('modeBagOfWords').classList.add('active');
+            }
+            
+            // Update visualization if data is loaded
+            if (ngramData.length > 0) {
+                updateVisualization();
+            }
+        }
+
+        function handleFileSelect(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+            
+            currentFileName = file.name;
+            document.getElementById('fileName').textContent = file.name;
+            document.getElementById('error').style.display = 'none';
+            
+            Papa.parse(file, {
+                header: true,
+                skipEmptyLines: true,
+                complete: function(results) {
+                    try {
+                        processData(results.data);
+                    } catch (error) {
+                        showError('Error processing file: ' + error.message);
+                    }
+                },
+                error: function(error) {
+                    showError('Error parsing CSV: ' + error.message);
+                }
+            });
+        }
+
+        function processData(data) {
+            ngramData = [];
+            
+            for (let row of data) {
+                const ngram = (row.NGram || row.ngram || '').trim();
+                const freq = parseInt(row.Frequency || row.frequency || 0);
+                
+                if (ngram && freq > 0) {
+                    ngramData.push({ ngram, frequency: freq });
+                }
+            }
+            
+            if (ngramData.length === 0) {
+                showError('No valid NGram data found. Please ensure your CSV has "NGram" and "Frequency" columns.');
+                return;
+            }
+            
+            updateVisualization();
+        }
+
+        function calculateOverlap(ngram1, ngram2) {
+            const words1 = ngram1.split(' ');
+            const words2 = ngram2.split(' ');
+            const n = words1.length;
+            
+            // Check for suffix of ngram1 matching prefix of ngram2
+            for (let len = n - 1; len >= 1; len--) {
+                const suffix = words1.slice(-len).join(' ');
+                const prefix = words2.slice(0, len).join(' ');
+                
+                if (suffix === prefix) {
+                    return len;
+                }
+            }
+            
+            return 0;
+        }
+
+        function calculateSharedWords(ngram1, ngram2) {
+            const words1 = ngram1.split(' ');
+            const words2 = ngram2.split(' ');
+            
+            // Count shared words (bag-of-words approach)
+            const wordCount1 = {};
+            const wordCount2 = {};
+            
+            for (let word of words1) {
+                wordCount1[word] = (wordCount1[word] || 0) + 1;
+            }
+            
+            for (let word of words2) {
+                wordCount2[word] = (wordCount2[word] || 0) + 1;
+            }
+            
+            let sharedCount = 0;
+            for (let word in wordCount1) {
+                if (wordCount2[word]) {
+                    sharedCount += Math.min(wordCount1[word], wordCount2[word]);
+                }
+            }
+            
+            return sharedCount;
+        }
+
+        function calculateEdgeWeight(ngram1, freq1, ngram2, freq2) {
+            const minFreq = Math.min(freq1, freq2);
+            const ngramLength = ngram1.split(' ').length;
+            
+            if (currentMode === 'overlapping') {
+                const overlap = calculateOverlap(ngram1, ngram2);
+                if (overlap === 0) return 0;
+                return (minFreq * overlap) / ngramLength;
+            } else {
+                // Bag-of-words mode
+                const sharedWords = calculateSharedWords(ngram1, ngram2);
+                if (sharedWords === 0) return 0;
+                return (minFreq * sharedWords) / ngramLength;
+            }
+        }
+
+        function updateVisualization() {
+            const minWeight = parseFloat(document.getElementById('minWeight').value) || 0;
+            const minFreq = parseFloat(document.getElementById('minFreq').value) || 0;
+            
+            // Filter by minimum frequency
+            const filteredData = ngramData.filter(d => d.frequency >= minFreq);
+            
+            if (filteredData.length === 0) {
+                showError('No NGrams match the current filters.');
+                return;
+            }
+            
+            // Create nodes
+            const nodes = filteredData.map((d, i) => ({
+                id: i,
+                ngram: d.ngram,
+                frequency: d.frequency
+            }));
+            
+            // Create edges
+            const links = [];
+            for (let i = 0; i < filteredData.length; i++) {
+                for (let j = i + 1; j < filteredData.length; j++) {
+                    const weight1 = calculateEdgeWeight(
+                        filteredData[i].ngram, filteredData[i].frequency,
+                        filteredData[j].ngram, filteredData[j].frequency
+                    );
+                    
+                    const weight2 = calculateEdgeWeight(
+                        filteredData[j].ngram, filteredData[j].frequency,
+                        filteredData[i].ngram, filteredData[i].frequency
+                    );
+                    
+                    const maxWeight = Math.max(weight1, weight2);
+                    
+                    if (maxWeight >= minWeight) {
+                        links.push({
+                            source: i,
+                            target: j,
+                            weight: maxWeight
+                        });
+                    }
+                }
+            }
+            
+            updateStats(nodes.length, links.length, links);
+            drawNetwork(nodes, links);
+            
+            // Store current network data
+            currentNodes = nodes;
+            currentLinks = links;
+            
+            // Enable save button
+            document.getElementById('saveGML').disabled = false;
+        }
+
+        function updateStats(nodeCount, edgeCount, links) {
+            document.getElementById('stats').style.display = 'grid';
+            document.getElementById('nodeCount').textContent = nodeCount;
+            document.getElementById('edgeCount').textContent = edgeCount;
+            
+            const avgWeight = edgeCount > 0 
+                ? (links.reduce((sum, l) => sum + l.weight, 0) / edgeCount).toFixed(2)
+                : 0;
+            document.getElementById('avgWeight').textContent = avgWeight;
+        }
+
+        function drawNetwork(nodes, links) {
+            const container = document.getElementById('network');
+            container.innerHTML = '';
+            
+            const width = container.clientWidth;
+            const height = container.clientHeight;
+            
+            svg = d3.select('#network')
+                .append('svg')
+                .attr('width', width)
+                .attr('height', height);
+            
+            // Create the group for graph elements
+            const g = svg.append('g');
+            
+            // Add zoom and pan behavior
+            const zoom = d3.zoom()
+                .scaleExtent([0.1, 10])
+                .on('zoom', (event) => {
+                    g.attr('transform', event.transform);
+                });
+            
+            svg.call(zoom);
+            
+            // Create force simulation
+            simulation = d3.forceSimulation(nodes)
+                .force('link', d3.forceLink(links).id(d => d.id).distance(d => 200 - d.weight))
+                .force('charge', d3.forceManyBody().strength(-300))
+                .force('center', d3.forceCenter(width / 2, height / 2))
+                .force('collision', d3.forceCollide().radius(40));
+            
+            // Draw links
+            const link = g.append('g')
+                .selectAll('line')
+                .data(links)
+                .enter()
+                .append('line')
+                .attr('class', 'link')
+                .attr('stroke-width', d => Math.sqrt(d.weight) / 2);
+            
+            // Draw edge labels
+            const edgeLabel = g.append('g')
+                .selectAll('text')
+                .data(links)
+                .enter()
+                .append('text')
+                .attr('class', 'edge-label')
+                .attr('pointer-events', 'none')
+                .text(d => d.weight.toFixed(2));
+            
+            // Custom drag behavior for nodes that doesn't interfere with zoom
+            const drag = d3.drag()
+                .subject(function(event, d) { return d; })
+                .on('start', function(event, d) {
+                    if (!event.active) simulation.alphaTarget(0.3).restart();
+                    d.fx = d.x;
+                    d.fy = d.y;
+                    // Disable zoom while dragging nodes
+                    svg.on('.zoom', null);
+                })
+                .on('drag', function(event, d) {
+                    d.fx = event.x;
+                    d.fy = event.y;
+                })
+                .on('end', function(event, d) {
+                    if (!event.active) simulation.alphaTarget(0);
+                    d.fx = null;
+                    d.fy = null;
+                    // Re-enable zoom after dragging
+                    svg.call(zoom);
+                });
+            
+            // Draw nodes
+            const node = g.append('g')
+                .selectAll('circle')
+                .data(nodes)
+                .enter()
+                .append('circle')
+                .attr('class', 'node')
+                .attr('r', d => 5 + Math.sqrt(d.frequency))
+                .attr('fill', d => d3.interpolateRainbow(d.id / nodes.length))
+                .style('cursor', 'move')
+                .call(drag);
+            
+            // Draw labels (N-gram text above nodes)
+            const label = g.append('g')
+                .selectAll('text')
+                .data(nodes)
+                .enter()
+                .append('text')
+                .attr('class', 'node-label')
+                .attr('pointer-events', 'none')
+                .text(d => d.ngram)
+                .attr('text-anchor', 'middle')
+                .attr('dy', d => -(5 + Math.sqrt(d.frequency)) - 5);
+            
+            // Draw frequency labels (inside nodes)
+            const freqLabel = g.append('g')
+                .selectAll('text')
+                .data(nodes)
+                .enter()
+                .append('text')
+                .attr('class', 'node-freq')
+                .attr('pointer-events', 'none')
+                .text(d => d.frequency)
+                .attr('text-anchor', 'middle')
+                .attr('dy', '0.35em');
+            
+            // Add title on hover
+            node.append('title')
+                .text(d => `${d.ngram}\nFrequency: ${d.frequency}`);
+            
+            simulation.on('tick', () => {
+                link
+                    .attr('x1', d => d.source.x)
+                    .attr('y1', d => d.source.y)
+                    .attr('x2', d => d.target.x)
+                    .attr('y2', d => d.target.y);
+                
+                edgeLabel
+                    .attr('x', d => (d.source.x + d.target.x) / 2)
+                    .attr('y', d => (d.source.y + d.target.y) / 2);
+                
+                node
+                    .attr('cx', d => d.x)
+                    .attr('cy', d => d.y);
+                
+                label
+                    .attr('x', d => d.x)
+                    .attr('y', d => d.y);
+                
+                freqLabel
+                    .attr('x', d => d.x)
+                    .attr('y', d => d.y);
+            });
+        }
+
+        function showError(message) {
+            const errorDiv = document.getElementById('error');
+            errorDiv.textContent = message;
+            errorDiv.style.display = 'block';
+            document.getElementById('stats').style.display = 'none';
+        }
+        
+        function saveToGML() {
+            if (currentNodes.length === 0) return;
+            
+            let gml = 'graph [\n';
+            gml += '  directed 0\n';
+            
+            // Add nodes
+            for (let node of currentNodes) {
+                gml += '  node [\n';
+                gml += `    id ${node.id}\n`;
+                gml += `    label "${node.ngram.replace(/"/g, '\\"')}"\n`;
+                gml += `    frequency ${node.frequency}\n`;
+                gml += '  ]\n';
+            }
+            
+            // Add edges
+            for (let link of currentLinks) {
+                gml += '  edge [\n';
+                gml += `    source ${link.source.id !== undefined ? link.source.id : link.source}\n`;
+                gml += `    target ${link.target.id !== undefined ? link.target.id : link.target}\n`;
+                gml += `    weight ${link.weight.toFixed(2)}\n`;
+                gml += '  ]\n';
+            }
+            
+            gml += ']\n';
+            
+            // Generate filename based on CSV filename
+            let gmlFileName = 'ngram_network.gml';
+            if (currentFileName) {
+                const nameWithoutExt = currentFileName.replace(/\.[^/.]+$/, '');
+                gmlFileName = nameWithoutExt + '.gml';
+            }
+            
+            // Download file
+            const blob = new Blob([gml], { type: 'text/plain' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = gmlFileName;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+        }
+    </script>
+</body>
+</html>
