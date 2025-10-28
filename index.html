@@ -1,0 +1,1145 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>NGram Network Visualizer</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.3.2/papaparse.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.8.5/d3.min.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+        
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            background: rgba(255, 255, 255, 0.95);
+            border-radius: 20px;
+            padding: 30px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+        }
+        
+        h1 {
+            color: #667eea;
+            margin-bottom: 5px;
+            font-size: 2em;
+        }
+        
+        .author {
+            color: #888;
+            margin-bottom: 10px;
+            font-size: 0.9em;
+            font-style: italic;
+        }
+        
+        .subtitle {
+            color: #666;
+            margin-bottom: 25px;
+            font-size: 0.95em;
+        }
+        
+        .upload-section {
+            margin-bottom: 25px;
+            padding: 25px;
+            background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+            border-radius: 15px;
+            border: 2px dashed #667eea;
+        }
+        
+        .file-input-wrapper {
+            position: relative;
+            display: inline-block;
+        }
+        
+        input[type="file"] {
+            display: none;
+        }
+        
+        .file-label {
+            display: inline-block;
+            padding: 12px 30px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border-radius: 10px;
+            cursor: pointer;
+            font-weight: 600;
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+        
+        .file-label:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(102, 126, 234, 0.4);
+        }
+        
+        .file-name {
+            display: inline-block;
+            margin-left: 15px;
+            color: #333;
+            font-weight: 500;
+        }
+        
+        .controls {
+            margin-bottom: 20px;
+            display: flex;
+            gap: 15px;
+            flex-wrap: wrap;
+            align-items: center;
+        }
+        
+        .controls-row {
+            display: flex;
+            gap: 15px;
+            flex-wrap: wrap;
+            align-items: center;
+            width: 100%;
+        }
+        
+        .word-search-section {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+            padding: 10px 15px;
+            background: #f8f9fa;
+            border-radius: 10px;
+            border: 1px solid #ddd;
+            flex: 1;
+            min-width: 250px;
+        }
+        
+        .word-search-section label {
+            font-size: 13px;
+            color: #666;
+            font-weight: 600;
+        }
+        
+        .word-search-section select {
+            flex: 1;
+            padding: 8px 12px;
+            border: 2px solid #ddd;
+            border-radius: 8px;
+            font-size: 14px;
+            cursor: pointer;
+            transition: border-color 0.3s;
+        }
+        
+        .word-search-section select:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+        
+        .modal {
+            display: none;
+            position: fixed;
+            z-index: 1000;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.5);
+            animation: fadeIn 0.3s;
+        }
+        
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+        
+        .modal-content {
+            background-color: white;
+            margin: 10% auto;
+            padding: 30px;
+            border-radius: 15px;
+            width: 80%;
+            max-width: 600px;
+            max-height: 70vh;
+            overflow-y: auto;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+            animation: slideDown 0.3s;
+        }
+        
+        @keyframes slideDown {
+            from {
+                transform: translateY(-50px);
+                opacity: 0;
+            }
+            to {
+                transform: translateY(0);
+                opacity: 1;
+            }
+        }
+        
+        .modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+            padding-bottom: 15px;
+            border-bottom: 2px solid #667eea;
+        }
+        
+        .modal-header h2 {
+            color: #667eea;
+            margin: 0;
+        }
+        
+        .close-btn {
+            font-size: 28px;
+            font-weight: bold;
+            color: #999;
+            cursor: pointer;
+            transition: color 0.3s;
+        }
+        
+        .close-btn:hover {
+            color: #333;
+        }
+        
+        .ngram-list {
+            list-style: none;
+            padding: 0;
+            margin: 0;
+        }
+        
+        .ngram-item {
+            padding: 12px 15px;
+            margin: 8px 0;
+            background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.3s;
+            border: 2px solid transparent;
+        }
+        
+        .ngram-item:hover {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            transform: translateX(5px);
+            border-color: #667eea;
+        }
+        
+        .ngram-item-text {
+            font-weight: 600;
+            font-size: 15px;
+        }
+        
+        .ngram-item-freq {
+            font-size: 12px;
+            opacity: 0.8;
+            margin-left: 10px;
+        }
+        
+        @keyframes blink {
+            0%, 100% { opacity: 1; r: attr(data-r); }
+            50% { opacity: 0.3; r: calc(attr(data-r) * 1.5); }
+        }
+        
+        .blinking {
+            animation: blink 0.6s ease-in-out 3;
+        }
+        
+        .filter-section {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+            padding: 10px 15px;
+            background: #f8f9fa;
+            border-radius: 10px;
+            border: 1px solid #ddd;
+        }
+        
+        .filter-section label {
+            font-size: 13px;
+            color: #666;
+        }
+        
+        .mode-selector {
+            display: flex;
+            background: #f0f0f0;
+            border-radius: 10px;
+            padding: 4px;
+            gap: 4px;
+        }
+        
+        .mode-btn {
+            padding: 8px 20px;
+            background: transparent;
+            color: #555;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: 600;
+            font-size: 14px;
+            transition: all 0.3s;
+        }
+        
+        .mode-btn.active {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            box-shadow: 0 2px 8px rgba(102, 126, 234, 0.3);
+        }
+        
+        .mode-btn:hover:not(.active) {
+            background: #e0e0e0;
+        }
+        
+        .save-btn {
+            padding: 10px 25px;
+            background: linear-gradient(135deg, #28a745 0%, #20c997 100%);
+            color: white;
+            border: none;
+            border-radius: 10px;
+            cursor: pointer;
+            font-weight: 600;
+            font-size: 14px;
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+        
+        .save-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(40, 167, 69, 0.4);
+        }
+        
+        .save-btn:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+            transform: none;
+        }
+        
+        .control-group {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        
+        label {
+            font-weight: 600;
+            color: #555;
+        }
+        
+        input[type="number"] {
+            padding: 8px 12px;
+            border: 2px solid #ddd;
+            border-radius: 8px;
+            width: 100px;
+            font-size: 14px;
+            transition: border-color 0.3s;
+        }
+        
+        input[type="number"]:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+        
+        .stats {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+        
+        .stat-card {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            padding: 20px;
+            border-radius: 12px;
+            color: white;
+            box-shadow: 0 5px 15px rgba(102, 126, 234, 0.3);
+        }
+        
+        .stat-label {
+            font-size: 0.85em;
+            opacity: 0.9;
+            margin-bottom: 5px;
+        }
+        
+        .stat-value {
+            font-size: 1.8em;
+            font-weight: bold;
+        }
+        
+        #network {
+            width: 100%;
+            height: 700px;
+            border: 2px solid #ddd;
+            border-radius: 15px;
+            background: #fafafa;
+            overflow: hidden;
+            cursor: grab;
+        }
+        
+        #network:active {
+            cursor: grabbing;
+        }
+        
+        .node {
+            cursor: move;
+            transition: r 0.3s;
+        }
+        
+        .node:hover {
+            stroke: #ff6b6b;
+            stroke-width: 3px;
+        }
+        
+        .link {
+            stroke: #999;
+            stroke-opacity: 0.6;
+        }
+        
+        .edge-label {
+            font-size: 12px;
+            fill: #333;
+            font-weight: bold;
+            pointer-events: none;
+            background: white;
+            paint-order: stroke;
+            stroke: white;
+            stroke-width: 3px;
+            stroke-linecap: round;
+            stroke-linejoin: round;
+        }
+        
+        .node-label {
+            font-size: 11px;
+            pointer-events: none;
+            fill: #333;
+            font-weight: 500;
+        }
+        
+        .node-freq {
+            font-size: 10px;
+            pointer-events: none;
+            fill: white;
+            font-weight: bold;
+            text-anchor: middle;
+        }
+        
+        .error {
+            background: #fee;
+            border: 2px solid #fcc;
+            color: #c33;
+            padding: 15px;
+            border-radius: 10px;
+            margin-bottom: 20px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>NGram Network Visualizer</h1>
+        <p class="author">Ikbal Maulana @2025</p>
+        <p class="subtitle">Upload a CSV file to visualize NGram relationships based on overlapping phrases</p>
+        
+        <div class="upload-section">
+            <div class="file-input-wrapper">
+                <input type="file" id="fileInput" accept=".csv">
+                <label for="fileInput" class="file-label">Choose CSV File</label>
+            </div>
+            <span class="file-name" id="fileName">No file chosen</span>
+        </div>
+        
+        <div class="controls">
+            <div class="controls-row">
+                <div class="mode-selector">
+                    <button class="mode-btn active" id="modeOverlapping">Overlapping</button>
+                    <button class="mode-btn" id="modeBagOfWords">Bag-of-Words</button>
+                </div>
+                <div class="control-group">
+                    <label for="minWeight">Min Edge Weight:</label>
+                    <input type="number" id="minWeight" value="5" min="0" step="1">
+                </div>
+                <div class="control-group">
+                    <label for="minFreq">Min Frequency:</label>
+                    <input type="number" id="minFreq" value="0" min="0" step="1">
+                </div>
+                <button id="saveGML" class="save-btn" disabled>Save to GML</button>
+            </div>
+            <div class="controls-row">
+                <div class="filter-section">
+                    <label>Show components with size ≥</label>
+                    <input type="number" id="minComponentSize" value="1" min="1" step="1" style="width: 80px;">
+                    <label>(1=all, 2=pairs+, 3=triplets+, etc.)</label>
+                </div>
+                <div class="word-search-section">
+                    <label>Find word:</label>
+                    <select id="wordDropdown">
+                        <option value="">Select a word...</option>
+                    </select>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Modal for showing N-grams -->
+        <div id="ngramModal" class="modal">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h2 id="modalTitle">N-grams containing word</h2>
+                    <span class="close-btn" id="closeModal">&times;</span>
+                </div>
+                <ul class="ngram-list" id="ngramList"></ul>
+            </div>
+        </div>
+        
+        <div id="error" class="error" style="display: none;"></div>
+        
+        <div class="stats" id="stats" style="display: none;">
+            <div class="stat-card">
+                <div class="stat-label">Total Nodes</div>
+                <div class="stat-value" id="nodeCount">0</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-label">Total Edges</div>
+                <div class="stat-value" id="edgeCount">0</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-label">Avg Edge Weight</div>
+                <div class="stat-value" id="avgWeight">0</div>
+            </div>
+        </div>
+        
+        <div id="network"></div>
+    </div>
+
+    <script>
+        let ngramData = [];
+        let svg, simulation;
+        let currentNodes = [];
+        let currentLinks = [];
+        let currentFileName = '';
+        let currentMode = 'overlapping'; // 'overlapping' or 'bagofwords'
+        let zoomBehavior = null;
+        let gGroup = null;
+
+        document.getElementById('fileInput').addEventListener('change', handleFileSelect);
+        document.getElementById('minWeight').addEventListener('change', updateVisualization);
+        document.getElementById('minFreq').addEventListener('change', updateVisualization);
+        document.getElementById('minComponentSize').addEventListener('change', updateVisualization);
+        document.getElementById('saveGML').addEventListener('click', saveToGML);
+        document.getElementById('modeOverlapping').addEventListener('click', () => setMode('overlapping'));
+        document.getElementById('modeBagOfWords').addEventListener('click', () => setMode('bagofwords'));
+        document.getElementById('wordDropdown').addEventListener('change', handleWordSelection);
+        document.getElementById('closeModal').addEventListener('click', closeModal);
+        
+        // Close modal when clicking outside
+        window.addEventListener('click', function(event) {
+            const modal = document.getElementById('ngramModal');
+            if (event.target === modal) {
+                closeModal();
+            }
+        });
+
+        function populateWordDropdown() {
+            const wordFrequency = {};
+            
+            // Count word frequencies across all visible N-grams
+            currentNodes.forEach(node => {
+                const words = node.ngram.split(' ');
+                words.forEach(word => {
+                    if (!wordFrequency[word]) {
+                        wordFrequency[word] = 0;
+                    }
+                    wordFrequency[word]++;
+                });
+            });
+            
+            // Sort words alphabetically
+            const sortedWords = Object.keys(wordFrequency).sort();
+            
+            // Populate dropdown
+            const dropdown = document.getElementById('wordDropdown');
+            dropdown.innerHTML = '<option value="">Select a word...</option>';
+            
+            sortedWords.forEach(word => {
+                const option = document.createElement('option');
+                option.value = word;
+                option.textContent = `${word} (${wordFrequency[word]})`;
+                dropdown.appendChild(option);
+            });
+        }
+        
+        function handleWordSelection(event) {
+            const selectedWord = event.target.value;
+            if (!selectedWord) return;
+            
+            // Find all N-grams containing this word
+            const matchingNgrams = currentNodes.filter(node => {
+                const words = node.ngram.split(' ');
+                return words.includes(selectedWord);
+            });
+            
+            // Show modal with matching N-grams
+            showNgramsModal(selectedWord, matchingNgrams);
+        }
+        
+        function showNgramsModal(word, ngrams) {
+            const modal = document.getElementById('ngramModal');
+            const modalTitle = document.getElementById('modalTitle');
+            const ngramList = document.getElementById('ngramList');
+            
+            modalTitle.textContent = `N-grams containing "${word}" (${ngrams.length})`;
+            
+            ngramList.innerHTML = '';
+            ngrams.forEach(node => {
+                const li = document.createElement('li');
+                li.className = 'ngram-item';
+                li.innerHTML = `
+                    <span class="ngram-item-text">${node.ngram}</span>
+                    <span class="ngram-item-freq">(freq: ${node.frequency})</span>
+                `;
+                li.addEventListener('click', () => {
+                    focusOnNode(node);
+                    closeModal();
+                });
+                ngramList.appendChild(li);
+            });
+            
+            modal.style.display = 'block';
+        }
+        
+        function closeModal() {
+            document.getElementById('ngramModal').style.display = 'none';
+            document.getElementById('wordDropdown').value = '';
+        }
+        
+        function focusOnNode(node) {
+            if (!svg || !gGroup) return;
+            
+            const container = document.getElementById('network');
+            const width = container.clientWidth;
+            const height = container.clientHeight;
+            
+            // Calculate transform to center the node
+            const scale = 1.5; // Zoom level
+            const x = -node.x * scale + width / 2;
+            const y = -node.y * scale + height / 2;
+            
+            // Animate to the node
+            svg.transition()
+                .duration(750)
+                .call(zoomBehavior.transform, d3.zoomIdentity.translate(x, y).scale(scale));
+            
+            // Blink the node
+            const nodeElement = d3.selectAll('.node')
+                .filter(d => d.id === node.id);
+            
+            const originalRadius = parseFloat(nodeElement.attr('r'));
+            
+            nodeElement
+                .transition()
+                .duration(200)
+                .attr('r', originalRadius * 1.8)
+                .attr('stroke', '#ff0000')
+                .attr('stroke-width', 4)
+                .transition()
+                .duration(200)
+                .attr('r', originalRadius)
+                .transition()
+                .duration(200)
+                .attr('r', originalRadius * 1.8)
+                .transition()
+                .duration(200)
+                .attr('r', originalRadius)
+                .transition()
+                .duration(200)
+                .attr('r', originalRadius * 1.8)
+                .transition()
+                .duration(200)
+                .attr('r', originalRadius)
+                .attr('stroke', null)
+                .attr('stroke-width', null);
+        }
+        
+        function setMode(mode) {
+            currentMode = mode;
+            
+            // Update button styles
+            if (mode === 'overlapping') {
+                document.getElementById('modeOverlapping').classList.add('active');
+                document.getElementById('modeBagOfWords').classList.remove('active');
+            } else {
+                document.getElementById('modeOverlapping').classList.remove('active');
+                document.getElementById('modeBagOfWords').classList.add('active');
+            }
+            
+            // Update visualization if data is loaded
+            if (ngramData.length > 0) {
+                updateVisualization();
+            }
+        }
+
+        function handleFileSelect(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+            
+            currentFileName = file.name;
+            document.getElementById('fileName').textContent = file.name;
+            document.getElementById('error').style.display = 'none';
+            
+            Papa.parse(file, {
+                header: true,
+                skipEmptyLines: true,
+                complete: function(results) {
+                    try {
+                        processData(results.data);
+                    } catch (error) {
+                        showError('Error processing file: ' + error.message);
+                    }
+                },
+                error: function(error) {
+                    showError('Error parsing CSV: ' + error.message);
+                }
+            });
+        }
+
+        function processData(data) {
+            ngramData = [];
+            
+            for (let row of data) {
+                const ngram = (row.NGram || row.ngram || '').trim();
+                const freq = parseInt(row.Frequency || row.frequency || 0);
+                
+                if (ngram && freq > 0) {
+                    ngramData.push({ ngram, frequency: freq });
+                }
+            }
+            
+            if (ngramData.length === 0) {
+                showError('No valid NGram data found. Please ensure your CSV has "NGram" and "Frequency" columns.');
+                return;
+            }
+            
+            updateVisualization();
+        }
+
+        function calculateOverlap(ngram1, ngram2) {
+            const words1 = ngram1.split(' ');
+            const words2 = ngram2.split(' ');
+            const n = words1.length;
+            
+            // Check for suffix of ngram1 matching prefix of ngram2
+            for (let len = n - 1; len >= 1; len--) {
+                const suffix = words1.slice(-len).join(' ');
+                const prefix = words2.slice(0, len).join(' ');
+                
+                if (suffix === prefix) {
+                    return len;
+                }
+            }
+            
+            return 0;
+        }
+
+        function calculateSharedWords(ngram1, ngram2) {
+            const words1 = ngram1.split(' ');
+            const words2 = ngram2.split(' ');
+            
+            // Count shared words (bag-of-words approach)
+            const wordCount1 = {};
+            const wordCount2 = {};
+            
+            for (let word of words1) {
+                wordCount1[word] = (wordCount1[word] || 0) + 1;
+            }
+            
+            for (let word of words2) {
+                wordCount2[word] = (wordCount2[word] || 0) + 1;
+            }
+            
+            let sharedCount = 0;
+            for (let word in wordCount1) {
+                if (wordCount2[word]) {
+                    sharedCount += Math.min(wordCount1[word], wordCount2[word]);
+                }
+            }
+            
+            return sharedCount;
+        }
+
+        function calculateEdgeWeight(ngram1, freq1, ngram2, freq2) {
+            const minFreq = Math.min(freq1, freq2);
+            const ngramLength = ngram1.split(' ').length;
+            
+            if (currentMode === 'overlapping') {
+                const overlap = calculateOverlap(ngram1, ngram2);
+                if (overlap === 0) return 0;
+                return (minFreq * overlap) / ngramLength;
+            } else {
+                // Bag-of-words mode
+                const sharedWords = calculateSharedWords(ngram1, ngram2);
+                if (sharedWords === 0) return 0;
+                return (minFreq * sharedWords) / ngramLength;
+            }
+        }
+
+        function findConnectedComponents(nodes, links) {
+            // Build adjacency list
+            const adj = {};
+            nodes.forEach(node => {
+                adj[node.id] = [];
+            });
+            
+            links.forEach(link => {
+                const sourceId = typeof link.source === 'object' ? link.source.id : link.source;
+                const targetId = typeof link.target === 'object' ? link.target.id : link.target;
+                if (adj[sourceId] && adj[targetId]) {
+                    adj[sourceId].push(targetId);
+                    adj[targetId].push(sourceId);
+                }
+            });
+            
+            // Find connected components using DFS
+            const visited = new Set();
+            const components = [];
+            
+            nodes.forEach(node => {
+                if (!visited.has(node.id)) {
+                    const component = [];
+                    const stack = [node.id];
+                    
+                    while (stack.length > 0) {
+                        const currentId = stack.pop();
+                        
+                        if (visited.has(currentId)) continue;
+                        
+                        visited.add(currentId);
+                        component.push(currentId);
+                        
+                        if (adj[currentId]) {
+                            adj[currentId].forEach(neighborId => {
+                                if (!visited.has(neighborId)) {
+                                    stack.push(neighborId);
+                                }
+                            });
+                        }
+                    }
+                    
+                    components.push(component);
+                }
+            });
+            
+            return components;
+        }
+
+        function filterByComponentSize(nodes, links, minSize) {
+            if (minSize <= 1) {
+                return { nodes, links };
+            }
+            
+            // Find connected components
+            const components = findConnectedComponents(nodes, links);
+            
+            // Filter components by size
+            const validNodeIds = new Set();
+            components.forEach(component => {
+                if (component.length >= minSize) {
+                    component.forEach(nodeId => validNodeIds.add(nodeId));
+                }
+            });
+            
+            // Filter nodes and remap IDs
+            const filteredNodes = nodes.filter(node => validNodeIds.has(node.id));
+            const oldToNewId = {};
+            filteredNodes.forEach((node, idx) => {
+                oldToNewId[node.id] = idx;
+                node.id = idx;
+            });
+            
+            // Filter links and update IDs
+            const filteredLinks = [];
+            links.forEach(link => {
+                const sourceId = typeof link.source === 'object' ? link.source.id : link.source;
+                const targetId = typeof link.target === 'object' ? link.target.id : link.target;
+                
+                if (validNodeIds.has(sourceId) && validNodeIds.has(targetId)) {
+                    filteredLinks.push({
+                        source: oldToNewId[sourceId],
+                        target: oldToNewId[targetId],
+                        weight: link.weight
+                    });
+                }
+            });
+            
+            return { nodes: filteredNodes, links: filteredLinks };
+        }
+
+        function updateVisualization() {
+            const minWeight = parseFloat(document.getElementById('minWeight').value) || 0;
+            const minFreq = parseFloat(document.getElementById('minFreq').value) || 0;
+            const minComponentSize = parseInt(document.getElementById('minComponentSize').value) || 1;
+            
+            // Filter by minimum frequency
+            const filteredData = ngramData.filter(d => d.frequency >= minFreq);
+            
+            if (filteredData.length === 0) {
+                showError('No NGrams match the current filters.');
+                return;
+            }
+            
+            // Create nodes
+            let nodes = filteredData.map((d, i) => ({
+                id: i,
+                ngram: d.ngram,
+                frequency: d.frequency
+            }));
+            
+            // Create edges
+            let links = [];
+            for (let i = 0; i < filteredData.length; i++) {
+                for (let j = i + 1; j < filteredData.length; j++) {
+                    const weight1 = calculateEdgeWeight(
+                        filteredData[i].ngram, filteredData[i].frequency,
+                        filteredData[j].ngram, filteredData[j].frequency
+                    );
+                    
+                    const weight2 = calculateEdgeWeight(
+                        filteredData[j].ngram, filteredData[j].frequency,
+                        filteredData[i].ngram, filteredData[i].frequency
+                    );
+                    
+                    const maxWeight = Math.max(weight1, weight2);
+                    
+                    if (maxWeight >= minWeight) {
+                        links.push({
+                            source: i,
+                            target: j,
+                            weight: maxWeight
+                        });
+                    }
+                }
+            }
+            
+            // Filter by component size
+            const filtered = filterByComponentSize(nodes, links, minComponentSize);
+            nodes = filtered.nodes;
+            links = filtered.links;
+            
+            if (nodes.length === 0) {
+                showError('No components match the minimum size filter.');
+                return;
+            }
+            
+            updateStats(nodes.length, links.length, links);
+            drawNetwork(nodes, links);
+            
+            // Store current network data
+            currentNodes = nodes;
+            currentLinks = links;
+            
+            // Populate word dropdown
+            populateWordDropdown();
+            
+            // Enable save button
+            document.getElementById('saveGML').disabled = false;
+        }
+
+        function updateStats(nodeCount, edgeCount, links) {
+            document.getElementById('stats').style.display = 'grid';
+            document.getElementById('nodeCount').textContent = nodeCount;
+            document.getElementById('edgeCount').textContent = edgeCount;
+            
+            const avgWeight = edgeCount > 0 
+                ? (links.reduce((sum, l) => sum + l.weight, 0) / edgeCount).toFixed(2)
+                : 0;
+            document.getElementById('avgWeight').textContent = avgWeight;
+        }
+
+        function drawNetwork(nodes, links) {
+            const container = document.getElementById('network');
+            container.innerHTML = '';
+            
+            const width = container.clientWidth;
+            const height = container.clientHeight;
+            
+            svg = d3.select('#network')
+                .append('svg')
+                .attr('width', width)
+                .attr('height', height);
+            
+            // Create the group for graph elements
+            gGroup = svg.append('g');
+            
+            // Add zoom and pan behavior
+            zoomBehavior = d3.zoom()
+                .scaleExtent([0.1, 10])
+                .on('zoom', (event) => {
+                    gGroup.attr('transform', event.transform);
+                });
+            
+            svg.call(zoomBehavior);
+            
+            // Create force simulation
+            simulation = d3.forceSimulation(nodes)
+                .force('link', d3.forceLink(links).id(d => d.id).distance(d => 200 - d.weight))
+                .force('charge', d3.forceManyBody().strength(-300))
+                .force('center', d3.forceCenter(width / 2, height / 2))
+                .force('collision', d3.forceCollide().radius(40));
+            
+            // Draw links
+            const link = gGroup.append('g')
+                .selectAll('line')
+                .data(links)
+                .enter()
+                .append('line')
+                .attr('class', 'link')
+                .attr('stroke-width', d => Math.sqrt(d.weight) / 2);
+            
+            // Draw edge labels
+            const edgeLabel = gGroup.append('g')
+                .selectAll('text')
+                .data(links)
+                .enter()
+                .append('text')
+                .attr('class', 'edge-label')
+                .attr('pointer-events', 'none')
+                .text(d => d.weight.toFixed(2));
+            
+            // Custom drag behavior for nodes that doesn't interfere with zoom
+            const drag = d3.drag()
+                .subject(function(event, d) { return d; })
+                .on('start', function(event, d) {
+                    if (!event.active) simulation.alphaTarget(0.3).restart();
+                    d.fx = d.x;
+                    d.fy = d.y;
+                    // Disable zoom while dragging nodes
+                    svg.on('.zoom', null);
+                })
+                .on('drag', function(event, d) {
+                    d.fx = event.x;
+                    d.fy = event.y;
+                })
+                .on('end', function(event, d) {
+                    if (!event.active) simulation.alphaTarget(0);
+                    d.fx = null;
+                    d.fy = null;
+                    // Re-enable zoom after dragging
+                    svg.call(zoomBehavior);
+                });
+            
+            // Draw nodes
+            const node = gGroup.append('g')
+                .selectAll('circle')
+                .data(nodes)
+                .enter()
+                .append('circle')
+                .attr('class', 'node')
+                .attr('r', d => 5 + Math.sqrt(d.frequency))
+                .attr('fill', d => d3.interpolateRainbow(d.id / nodes.length))
+                .style('cursor', 'move')
+                .call(drag);
+            
+            // Draw labels (N-gram text above nodes)
+            const label = gGroup.append('g')
+                .selectAll('text')
+                .data(nodes)
+                .enter()
+                .append('text')
+                .attr('class', 'node-label')
+                .attr('pointer-events', 'none')
+                .text(d => d.ngram)
+                .attr('text-anchor', 'middle')
+                .attr('dy', d => -(5 + Math.sqrt(d.frequency)) - 5);
+            
+            // Draw frequency labels (inside nodes)
+            const freqLabel = gGroup.append('g')
+                .selectAll('text')
+                .data(nodes)
+                .enter()
+                .append('text')
+                .attr('class', 'node-freq')
+                .attr('pointer-events', 'none')
+                .text(d => d.frequency)
+                .attr('text-anchor', 'middle')
+                .attr('dy', '0.35em');
+            
+            // Add title on hover
+            node.append('title')
+                .text(d => `${d.ngram}\nFrequency: ${d.frequency}`);
+            
+            simulation.on('tick', () => {
+                link
+                    .attr('x1', d => d.source.x)
+                    .attr('y1', d => d.source.y)
+                    .attr('x2', d => d.target.x)
+                    .attr('y2', d => d.target.y);
+                
+                edgeLabel
+                    .attr('x', d => (d.source.x + d.target.x) / 2)
+                    .attr('y', d => (d.source.y + d.target.y) / 2);
+                
+                node
+                    .attr('cx', d => d.x)
+                    .attr('cy', d => d.y);
+                
+                label
+                    .attr('x', d => d.x)
+                    .attr('y', d => d.y);
+                
+                freqLabel
+                    .attr('x', d => d.x)
+                    .attr('y', d => d.y);
+            });
+        }
+
+        function showError(message) {
+            const errorDiv = document.getElementById('error');
+            errorDiv.textContent = message;
+            errorDiv.style.display = 'block';
+            document.getElementById('stats').style.display = 'none';
+        }
+        
+        function saveToGML() {
+            if (currentNodes.length === 0) return;
+            
+            let gml = 'graph [\n';
+            gml += '  directed 0\n';
+            
+            // Add nodes
+            for (let node of currentNodes) {
+                gml += '  node [\n';
+                gml += `    id ${node.id}\n`;
+                gml += `    label "${node.ngram.replace(/"/g, '\\"')}"\n`;
+                gml += `    frequency ${node.frequency}\n`;
+                gml += '  ]\n';
+            }
+            
+            // Add edges
+            for (let link of currentLinks) {
+                gml += '  edge [\n';
+                gml += `    source ${link.source.id !== undefined ? link.source.id : link.source}\n`;
+                gml += `    target ${link.target.id !== undefined ? link.target.id : link.target}\n`;
+                gml += `    weight ${link.weight.toFixed(2)}\n`;
+                gml += '  ]\n';
+            }
+            
+            gml += ']\n';
+            
+            // Generate filename based on CSV filename
+            let gmlFileName = 'ngram_network.gml';
+            if (currentFileName) {
+                const nameWithoutExt = currentFileName.replace(/\.[^/.]+$/, '');
+                gmlFileName = nameWithoutExt + '.gml';
+            }
+            
+            // Download file
+            const blob = new Blob([gml], { type: 'text/plain' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = gmlFileName;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+        }
+    </script>
+</body>
+</html>
